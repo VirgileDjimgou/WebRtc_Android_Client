@@ -59,6 +59,7 @@ import com.android.gudana.apprtc.ConnectActivity;
 import com.android.gudana.chat.ChatApplication;
 import com.android.gudana.chat.adapters.Msg_adapter;
 import com.android.gudana.chat.db.AppDatabase;
+import com.android.gudana.chat.db.DatabaseCallback;
 import com.android.gudana.chat.db.DatabaseInitializer;
 import com.android.gudana.chat.fragments.Calls_Fragment;
 import com.android.gudana.chat.interface_listeners_menu.RecyclerClick_Listener;
@@ -176,7 +177,7 @@ import static io.opencensus.tags.TagValue.MAX_LENGTH;
 //import com.android.gudana.chatapp.utils_v2.FileOpen;
 
 
-public class ChatActivity extends AppCompatActivity {
+public class ChatActivity extends AppCompatActivity implements DatabaseCallback {
     private static final String TAG = "activities/ChatActivity";
     public static final int CodeLiveLocation = 500;
     public static int Increase = 0;
@@ -321,6 +322,8 @@ public class ChatActivity extends AppCompatActivity {
     User user;
     private List<MessageItem> offline_msg;
     public DatabaseInitializer databaseInitializer;
+    private LinearLayoutManager mMessageViewLayoutManager;
+
 
     public static void startActivity(Context context){
         Intent intent = new Intent(context, ChatActivity.class);
@@ -481,18 +484,44 @@ public class ChatActivity extends AppCompatActivity {
         RecyclerViewMessages = (RecyclerView) findViewById(R.id.listView_messages);
         ArrayList<MessageItem> list= new ArrayList<>();
 
+
+        mMessageViewLayoutManager = new LinearLayoutManager(ChatActivity.this) {
+            @Override
+            public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State state) {
+                // This is a hack for IndexOutOfBoundsException: Inconsistency detected. Invalid view holder adapter positionViewHolder
+                // It happens when two uploads are started at the same time.
+                // See discussion here:
+                // https://stackoverflow.com/questions/31759171/recyclerview-and-java-lang-indexoutofboundsexception-inconsistency-detected-in
+                try {
+                    super.onLayoutChildren(recycler, state);
+                } catch (IndexOutOfBoundsException e) {
+                    Log.e("probe", "meet a IOOBE in RecyclerView");
+                }
+            }
+        };
+        // mMessageViewLayoutManager.setStackFromEnd(true);
+        mMessageViewLayoutManager.setReverseLayout(false);
+
+        /*
         // adapter = new Msg_adapter(list,this);
-        @SuppressLint("WrongConstant") LinearLayoutManager linearLayoutManager = new LinearLayoutManager(ChatActivity.this, OrientationHelper.VERTICAL, false);
+        @SuppressLint("WrongConstant") LinearLayoutManager linearLayoutManager =
+                new LinearLayoutManager(ChatActivity.this, OrientationHelper.VERTICAL, false);
 
         RecyclerViewMessages.setLayoutManager(linearLayoutManager);
         RecyclerViewMessages.setItemAnimator(new ScaleUpAnimator());
         RecyclerViewMessages.setAdapter(adapter);
-        firstVisibleInListview = linearLayoutManager.findFirstVisibleItemPosition();
+        */
+
+        firstVisibleInListview = mMessageViewLayoutManager.findFirstVisibleItemPosition();
 
 
         adapter = new Msg_adapter(ChatActivity.this, username , this);
 
         RecyclerViewMessages.setAdapter(adapter);
+        adapter.notifyDataSetChanged();//notify adapter
+        RecyclerViewMessages.setLayoutManager(mMessageViewLayoutManager);
+
+
         // init databse  ....
         databaseInitializer = new DatabaseInitializer(ChatActivity.this);
 
@@ -584,9 +613,6 @@ public class ChatActivity extends AppCompatActivity {
                 }
             }
         });
-
-
-
 
         back_bottom = (ImageView) findViewById(R.id.back_bottom);
         back_bottom.setOnClickListener(new View.OnClickListener() {
@@ -785,10 +811,37 @@ public class ChatActivity extends AppCompatActivity {
         }
 
 
-
         // implement listeners on all messages  ...  for context menu    ...
         implementRecyclerViewClickListeners();
         // refresh Token Id in Firestore ...
+
+        // start Socket and local  databse Inialisation  ...
+
+        new Init_after_OnCreate_Task("Init_Socket").execute();
+        Config.Chat_Activity_running = true;
+
+    }
+
+    // databse callback overided methods
+    @Override
+    public void onMsgDeleted() {
+        // update  recyclerview   ...
+        // adapter.notifyItemRemoved(RecyclerViewMessages.getLayoutPosition());
+        adapter.notifyDataSetChanged();//notify adapter
+    }
+
+    @Override
+    public void onMsgAdded() {
+
+    }
+
+    @Override
+    public void onDataNotAvailable() {
+
+    }
+
+    @Override
+    public void onMsgUpdated() {
 
     }
 
@@ -1010,8 +1063,6 @@ public class ChatActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         // Init socket  ...
-        new Init_after_OnCreate_Task("Init_Socket").execute();
-        Config.Chat_Activity_running = true;
         super.onStart();
     }
 
@@ -1278,23 +1329,6 @@ public class ChatActivity extends AppCompatActivity {
         }
     };
 
-    /*
-
-    private final Emitter.Listener onBroadcast = new Emitter.Listener() {
-        @Override
-        public void call(Object... args) {
-            final Msg_adapter.BroadcastItem broadcastItem = new Msg_adapter.BroadcastItem((String) args[0]);
-
-            ChatActivity.this.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    adapter.addItem(broadcastItem);
-                }
-            });
-        }
-    };
-
-*/
 
     private final Emitter.Listener rethink_db_event_receive = new Emitter.Listener() {
         @Override
@@ -1374,8 +1408,7 @@ public class ChatActivity extends AppCompatActivity {
 
                             // update  OnServer Attribut message Objet  because the message is already saved  ....
                             // mark the message as already on the server  ...
-                            databaseInitializer.UpdateMessage(mDb , msgItem);
-                            RecyclerViewMessages.scrollToPosition(adapter.getItemCount() -1);
+                            // databaseInitializer.UpdateMessage(mDb , msgItem);
                             // send notification ....
 
                             try {
@@ -1413,7 +1446,7 @@ public class ChatActivity extends AppCompatActivity {
                             databaseInitializer.insert_new_message_Async(mDb , msgItem);
                             adapter.addItem(msgItem);
                             Play_Song_in_message();
-                            RecyclerViewMessages.scrollToPosition(adapter.getItemCount() -1);
+                            RecyclerViewMessages.smoothScrollToPosition(adapter.getItemCount() -1);
                         }
                     });
                 }
@@ -2023,17 +2056,6 @@ public class ChatActivity extends AppCompatActivity {
         protected Void doInBackground(String... args) {
             JSONObject inputJson;
 
-            // message Structure
-            /*
-            this.on_server = false;
-            this.user_id = user_id;
-            this.username = username;
-            this.message = message;
-            this.msg_type = msg_type;
-            this.on_server = on_server;
-            this.msg_uuid = msg_uuid;
-            */
-
             try {
                 inputJson = new JSONObject(info.toString());
                 inputJson.put("message", this.Msg_Item.getMessage());
@@ -2065,16 +2087,27 @@ public class ChatActivity extends AppCompatActivity {
 
             // send  firebase cloud notification
             // alwasy show the last message send  .....
+
             ChatActivity.this.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
 
                     int indices_local_message = adapter.addItem(Msg_Item);
                     //not_on_server_indices.add(indices_local_message);
-                    RecyclerViewMessages.scrollToPosition(adapter.getItemCount() -1);
+                    RecyclerViewMessages.smoothScrollToPosition(adapter.getItemCount() -1);
                 }
             });
-            // send notification ...not here because
+
+
+            /*
+            RecyclerViewMessages.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    RecyclerViewMessages.smoothScrollToPosition( adapter.getItemCount() -1);
+                }
+            }, 100);
+            */
+
         }
     }
 

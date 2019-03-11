@@ -46,6 +46,12 @@ import java.util.Map;
 
 import androidx.annotation.NonNull;
 import es.dmoral.toasty.Toasty;
+import io.reactivex.Completable;
+import io.reactivex.CompletableObserver;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Action;
+import io.reactivex.schedulers.Schedulers;
 
 public class DatabaseInitializer {
     public ChatActivity ParentActivity;
@@ -152,6 +158,34 @@ public class DatabaseInitializer {
     }
 
 
+    // Delete with rxjava
+
+    public void deleteUser(final DatabaseCallback databaseCallback, final AppDatabase db ,final MessageItem Msg_Item) {
+        Completable.fromAction(new Action() {
+            @Override
+            public void run() throws Exception {
+                //db.userDao().delete(user);
+                db.MessageItemModel().deleteMessage(Msg_Item);
+
+
+            }
+        }).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread()).subscribe(new CompletableObserver() {
+            @Override
+            public void onSubscribe(Disposable d) {
+
+            }
+
+            @Override
+            public void onComplete() {
+                databaseCallback.onMsgDeleted();
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                databaseCallback.onDataNotAvailable();
+            }
+        });
+    }
 
 
 }

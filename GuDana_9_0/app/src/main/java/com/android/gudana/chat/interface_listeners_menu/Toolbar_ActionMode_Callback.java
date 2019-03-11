@@ -89,7 +89,14 @@ public class Toolbar_ActionMode_Callback implements ActionMode.Callback {
                         //Print the data to show if its working properly or not
                         // get selected  row  and chehck
 
-                        this.ParentActivity.databaseInitializer.DeleteMessage(this.ParentActivity.mDb , SelectedMessage);
+                        ParentActivity.databaseInitializer.deleteUser(ParentActivity , ParentActivity.mDb , SelectedMessage );
+                        message_models.remove(selected.keyAt(i));
+
+                        // remove selected key
+
+
+
+                        // this.ParentActivity.databaseInitializer.DeleteMessage(this.ParentActivity.mDb , SelectedMessage);
                         // delete model ....
                         /*
                         Toast.makeText(context,  "adapter size  : " + this.ParentActivity.adapter.dataSet.size() +

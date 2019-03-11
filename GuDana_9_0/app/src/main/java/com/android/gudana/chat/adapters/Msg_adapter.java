@@ -10,6 +10,7 @@ import android.media.MediaPlayer;
 import android.os.AsyncTask;
 import android.util.Log;
 import android.util.SparseBooleanArray;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -53,6 +54,9 @@ import androidx.annotation.NonNull;
 import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.RecyclerView;
 import es.dmoral.toasty.Toasty;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.functions.Consumer;
+import io.reactivex.schedulers.Schedulers;
 
 
 /**
@@ -91,6 +95,9 @@ public class Msg_adapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private boolean fabStateVolume = false;
     //private ChatActivity ParentActivity;
     private SparseBooleanArray mSelectedItemsIds;
+    LinearLayout.LayoutParams params;
+
+
 
 
     // text view holder
@@ -158,21 +165,23 @@ public class Msg_adapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                             }
                         });
                     } else {
-                        ParentActivity.databaseInitializer.DeleteMessage(ParentActivity.mDb , MsgObject);
-                        // delete this message
-                        ParentActivity.runOnUiThread(new Runnable() {
-                            public void run() {
+                        // ParentActivity.databaseInitializer.DeleteMessage(ParentActivity.mDb , MsgObject);
+                        ParentActivity.databaseInitializer.deleteUser(ParentActivity , ParentActivity.mDb , MsgObject );
 
-                                try{
-                                    //Thread.sleep(1000);
-                                    //notifyDataSetChanged();
-                                    // Do stuff…
-                                }catch (Exception ex){
-                                    ex.printStackTrace();
-                                }
-                                deleteItem(position);
+                        /*
+                        // delete this message
+                        db.userDao().findById(1).
+                                subscribeOn(Schedulers.newThread()).
+                                observeOn(AndroidSchedulers.mainThread()).subscribe(new Consumer<User>() {
+
+                            @Override
+                            public void accept(@io.reactivex.annotations.NonNull User user) throws Exception {
+
+                                ParentActivity.databaseInitializer.deleteUser(ParentActivity , ParentActivity.mDb , MsgObject );
                             }
                         });
+
+                        */
 
                     }
                 }
@@ -224,7 +233,6 @@ public class Msg_adapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     public SparseBooleanArray getSelectedIds() {
         return mSelectedItemsIds;
     }
-
 
 
     // ImageView holder
@@ -300,6 +308,11 @@ public class Msg_adapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         this.ParentActivity = ParentActivity;
         mSelectedItemsIds = new SparseBooleanArray();
 
+
+        params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        //params.weight = 1.0f;
+        params.gravity = Gravity.END;
+
     }
 
     @Override
@@ -368,6 +381,7 @@ public class Msg_adapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 case MessageItem.TEXT_TYPE:
                     ((TextTypeViewHolder) holder).txt_message.setText(object.getMessage());
                     ((TextTypeViewHolder) holder).details_display.setText(object.getUsername()+" "+object.getDateTimeUTC());
+                    //((TextTypeViewHolder) holder) .cardView.setLayoutParams(params);
 
                     break;
                 case MessageItem.IMAGE_TYPE:
